@@ -1,46 +1,361 @@
-function debounce(func, wait, immediate) {
-  var timeout
-  return function () {
-    var context = this
-    var args = arguments
-    var later = function () {
-      timeout = null
-      if (!immediate) func.apply(context, args)
-    }
-    var callNow = immediate && !timeout
-    clearTimeout(timeout)
-    timeout = setTimeout(later, wait)
-    if (callNow) func.apply(context, args)
-  }
+/* utils function */
+import { navbarShrink } from "./layouts/navbarShrink.js";
+import { initTOC } from "./layouts/toc.js";
+import { main } from "./main.js";
+import imageViewer from "./tools/imageViewer.js";
+
+export const navigationState = {
+  isNavigating: false,
 };
 
-function throttle(func, wait, mustRun) {
-  var timeout
-  var startTime = new Date()
+export default function initUtils() {
+  const utils = {
+    html_root_dom: document.querySelector("html"),
+    pageContainer_dom: document.querySelector(".page-container"),
+    pageTop_dom: document.querySelector(".main-content-header"),
+    homeBanner_dom: document.querySelector(".home-banner-container"),
+    scrollProgressBar_dom: document.querySelector(".scroll-progress-bar"),
+    pjaxProgressBar_dom: document.querySelector(".pjax-progress-bar"),
+    pjaxProgressIcon_dom: document.querySelector(".swup-progress-icon"),
+    backToTopButton_dom: document.querySelector(".tool-scroll-to-top"),
+    toolsList: document.querySelector(".hidden-tools-list"),
+    toggleButton: document.querySelector(".toggle-tools-list"),
 
-  return function () {
-    var context = this
-    var args = arguments
-    var curTime = new Date()
+    innerHeight: window.innerHeight,
+    pjaxProgressBarTimer: null,
+    prevScrollValue: 0,
+    fontSizeLevel: 0,
 
-    clearTimeout(timeout)
-    if (curTime - startTime >= mustRun) {
-      func.apply(context, args)
-      startTime = curTime
-    } else {
-      timeout = setTimeout(func, wait)
-    }
-  }
-};
+    isHasScrollProgressBar: theme.global.scroll_progress.bar === true,
+    isHasScrollPercent: theme.global.scroll_progress.percentage === true,
 
-function isMobile() {
-  var check = false;
-  (function (a) { if (/(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino/i.test(a) || /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(a.substr(0, 4))) check = true })(navigator.userAgent || navigator.vendor || window.opera)
-  return check
-};
+    // Scroll Style
+    updateScrollStyle() {
+      const scrollTop =
+        window.pageYOffset || document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const clientHeight =
+        window.innerHeight || document.documentElement.clientHeight;
+      const percent = this.calculatePercentage(
+        scrollTop,
+        scrollHeight,
+        clientHeight,
+      );
 
-window.debounce = debounce
+      this.updateScrollProgressBar(percent);
+      this.updateScrollPercent(percent);
+      this.updatePageTopVisibility(scrollTop, clientHeight);
 
-window.throttle = throttle
+      this.prevScrollValue = scrollTop;
+    },
 
-window.isMobile = isMobile
+    updateScrollProgressBar(percent) {
+      if (this.isHasScrollProgressBar) {
+        const progressPercent = percent.toFixed(3);
+        const visibility = percent === 0 ? "hidden" : "visible";
+
+        this.scrollProgressBar_dom.style.visibility = visibility;
+        this.scrollProgressBar_dom.style.width = `${progressPercent}%`;
+      }
+    },
+
+    updateScrollPercent(percent) {
+      if (this.isHasScrollPercent) {
+        const percentDom = this.backToTopButton_dom.querySelector(".percent");
+        const showButton = percent !== 0 && percent !== undefined;
+
+        this.backToTopButton_dom.classList.toggle("show", showButton);
+        percentDom.innerHTML = percent.toFixed(0);
+      }
+    },
+
+    updatePageTopVisibility(scrollTop, clientHeight) {
+      if (theme.navbar.auto_hide) {
+        const prevScrollValue = this.prevScrollValue;
+        const hidePageTop =
+          prevScrollValue > clientHeight && scrollTop > prevScrollValue;
+
+        this.pageTop_dom.classList.toggle("hide", hidePageTop);
+      } else {
+        this.pageTop_dom.classList.remove("hide");
+      }
+    },
+
+    calculatePercentage(scrollTop, scrollHeight, clientHeight) {
+      return Math.round((scrollTop / (scrollHeight - clientHeight)) * 100);
+    },
+
+    // register window scroll event
+    registerWindowScroll() {
+      window.addEventListener("scroll", () => {
+        this.updateScrollStyle();
+        this.updateTOCScroll();
+        this.updateNavbarShrink();
+        this.updateHomeBannerBlur();
+        this.updateAutoHideTools();
+        this.updateAPlayerAutoHide();
+      });
+    },
+
+    updateTOCScroll() {
+      if (
+        theme.articles.toc.enable &&
+        initTOC().hasOwnProperty("updateActiveTOCLink")
+      ) {
+        initTOC().updateActiveTOCLink();
+      }
+    },
+
+    updateNavbarShrink() {
+      if (!navigationState.isNavigating) {
+        navbarShrink.init();
+      }
+    },
+
+    updateHomeBannerBlur() {
+      if (
+        theme.home_banner.style === "fixed" &&
+        location.pathname === config.root
+      ) {
+        const blurElement = document.querySelector(".home-banner-background");
+        const viewHeight = window.innerHeight;
+        const scrollY = window.scrollY || window.pageYOffset;
+        const triggerViewHeight = viewHeight / 2;
+        const blurValue = scrollY >= triggerViewHeight ? 15 : 0;
+
+        try {
+          blurElement.style.transition = "0.3s";
+          blurElement.style.webkitFilter = `blur(${blurValue}px)`;
+        } catch (e) {}
+      }
+    },
+
+    updateAutoHideTools() {
+      const y = window.pageYOffset;
+      const height = document.body.scrollHeight;
+      const windowHeight = window.innerHeight;
+      const toolList = document.getElementsByClassName(
+        "right-side-tools-container",
+      );
+
+      for (let i = 0; i < toolList.length; i++) {
+        const tools = toolList[i];
+        if (y <= 0) {
+          if (location.pathname !== "/") {
+            //console.log(location.pathname)
+          } else {
+            tools.classList.add("hide");
+          }
+        } else if (y + windowHeight >= height - 20) {
+          tools.classList.add("hide");
+        } else {
+          tools.classList.remove("hide");
+        }
+      }
+    },
+
+    updateAPlayerAutoHide() {
+      const aplayer = document.getElementById("aplayer");
+      if (aplayer == null) {
+      } else {
+        const y = window.pageYOffset;
+        const height = document.body.scrollHeight;
+        const windowHeight = window.innerHeight;
+        if (y <= 0) {
+          if (location.pathname !== "/") {
+            //console.log(location.pathname)
+          } else {
+            aplayer.classList.add("hide");
+          }
+        } else if (y + windowHeight >= height - 20) {
+          aplayer.classList.add("hide");
+        } else {
+          aplayer.classList.remove("hide");
+        }
+      }
+    },
+
+    toggleToolsList() {
+      this.toggleButton.addEventListener("click", () => {
+        this.toolsList.classList.toggle("show");
+      });
+    },
+
+    globalFontSizeAdjust() {
+      const htmlRoot = this.html_root_dom;
+      const fontAdjustPlus = document.querySelector(".tool-font-adjust-plus");
+      const fontAdjustMinus = document.querySelector(".tool-font-adjust-minus");
+
+      const fontSize = document.defaultView.getComputedStyle(
+        document.body,
+      ).fontSize;
+      const baseFontSize = parseFloat(fontSize);
+
+      let fontSizeLevel = 0;
+      const styleStatus = main.getStyleStatus();
+      if (styleStatus) {
+        fontSizeLevel = styleStatus.fontSizeLevel;
+        setFontSize(fontSizeLevel);
+      }
+
+      function setFontSize(level) {
+        const fontSize = baseFontSize * (1 + level * 0.05);
+        htmlRoot.style.fontSize = `${fontSize}px`;
+        main.styleStatus.fontSizeLevel = level;
+        main.setStyleStatus();
+      }
+
+      function increaseFontSize() {
+        fontSizeLevel = Math.min(fontSizeLevel + 1, 5);
+        setFontSize(fontSizeLevel);
+      }
+
+      function decreaseFontSize() {
+        fontSizeLevel = Math.max(fontSizeLevel - 1, 0);
+        setFontSize(fontSizeLevel);
+      }
+
+      fontAdjustPlus.addEventListener("click", increaseFontSize);
+      fontAdjustMinus.addEventListener("click", decreaseFontSize);
+    },
+    // go comment anchor
+    goComment() {
+      this.goComment_dom = document.querySelector(".go-comment");
+      if (this.goComment_dom) {
+        this.goComment_dom.addEventListener("click", () => {
+          const target = document.querySelector("#comment-anchor");
+          if (target) {
+            const offset = target.getBoundingClientRect().top + window.scrollY;
+            window.scrollTo({
+              top: offset,
+              behavior: "smooth",
+            });
+          }
+        });
+      }
+    },
+
+    // get dom element height
+    getElementHeight(selectors) {
+      const dom = document.querySelector(selectors);
+      return dom ? dom.getBoundingClientRect().height : 0;
+    },
+
+    // init first screen height
+    inithomeBannerHeight() {
+      this.homeBanner_dom &&
+        (this.homeBanner_dom.style.height = this.innerHeight + "px");
+    },
+
+    // init page height handle
+    initPageHeightHandle() {
+      if (this.homeBanner_dom) return;
+      const temp_h1 = this.getElementHeight(".main-content-header");
+      const temp_h2 = this.getElementHeight(".main-content-body");
+      const temp_h3 = this.getElementHeight(".main-content-footer");
+      const allDomHeight = temp_h1 + temp_h2 + temp_h3;
+      const innerHeight = window.innerHeight;
+      const pb_dom = document.querySelector(".main-content-footer");
+      if (allDomHeight < innerHeight) {
+        const marginTopValue = Math.floor(innerHeight - allDomHeight);
+        if (marginTopValue > 0) {
+          pb_dom.style.marginTop = `${marginTopValue - 2}px`;
+        }
+      }
+    },
+
+    // big image viewer
+
+    // set how long ago language
+    setHowLongAgoLanguage(p1, p2) {
+      return p2.replace(/%s/g, p1);
+    },
+
+    getHowLongAgo(timestamp) {
+      const l = lang_ago;
+
+      const __Y = Math.floor(timestamp / (60 * 60 * 24 * 30) / 12);
+      const __M = Math.floor(timestamp / (60 * 60 * 24 * 30));
+      const __W = Math.floor(timestamp / (60 * 60 * 24) / 7);
+      const __d = Math.floor(timestamp / (60 * 60 * 24));
+      const __h = Math.floor((timestamp / (60 * 60)) % 24);
+      const __m = Math.floor((timestamp / 60) % 60);
+      const __s = Math.floor(timestamp % 60);
+
+      if (__Y > 0) {
+        return this.setHowLongAgoLanguage(__Y, l.year);
+      } else if (__M > 0) {
+        return this.setHowLongAgoLanguage(__M, l.month);
+      } else if (__W > 0) {
+        return this.setHowLongAgoLanguage(__W, l.week);
+      } else if (__d > 0) {
+        return this.setHowLongAgoLanguage(__d, l.day);
+      } else if (__h > 0) {
+        return this.setHowLongAgoLanguage(__h, l.hour);
+      } else if (__m > 0) {
+        return this.setHowLongAgoLanguage(__m, l.minute);
+      } else if (__s > 0) {
+        return this.setHowLongAgoLanguage(__s, l.second);
+      }
+    },
+
+    relativeTimeInHome() {
+      const post = document.querySelectorAll(
+        ".home-article-meta-info .home-article-date",
+      );
+      const df = theme.home.article_date_format;
+      if (df === "relative") {
+        post &&
+          post.forEach((v) => {
+            const nowDate = Date.now();
+            const postDate = new Date(
+              v.dataset.date.split(" GMT")[0],
+            ).getTime();
+            v.innerHTML = this.getHowLongAgo(
+              Math.floor((nowDate - postDate) / 1000),
+            );
+          });
+      } else if (df === "auto") {
+        post &&
+          post.forEach((v) => {
+            const nowDate = Date.now();
+            const postDate = new Date(
+              v.dataset.date.split(" GMT")[0],
+            ).getTime();
+            const finalDays = Math.floor(
+              (nowDate - postDate) / (60 * 60 * 24 * 1000),
+            );
+            if (finalDays < 7) {
+              v.innerHTML = this.getHowLongAgo(
+                Math.floor((nowDate - postDate) / 1000),
+              );
+            }
+          });
+      }
+    },
+  };
+
+  // init scroll
+  utils.registerWindowScroll();
+
+  // toggle show tools list
+  utils.toggleToolsList();
+
+  // main font adjust
+  utils.globalFontSizeAdjust();
+
+  // go comment
+  utils.goComment();
+
+  // init page height handle
+  utils.initPageHeightHandle();
+
+  // init first screen height
+  utils.inithomeBannerHeight();
+
+  // set how long ago in home article block
+  utils.relativeTimeInHome();
+
+  // image viewer handle
+  imageViewer();
+}
